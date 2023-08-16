@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Receiver\Contracts\Provider as ProviderContract;
 use Symfony\Component\HttpFoundation\Response;
@@ -43,6 +44,11 @@ abstract class AbstractProvider implements ProviderContract, Responsable
      * @var string
      */
     protected string $handlerNamespace = '\\App\\Http\\Handlers';
+
+    /**
+     * @var array
+     */
+    protected array $handlers = [];
 
     /**
      * @param string|null $secret
@@ -145,6 +151,16 @@ abstract class AbstractProvider implements ProviderContract, Responsable
         return $this->dispatched;
     }
 
+    public function registerEvent(string $event, string $handler): void
+    {
+        $this->handlers[$event] = $handler;
+    }
+
+    public function registerEvents(array $events): void
+    {
+        $this->handlers = array_merge($this->handlers, $events);
+    }
+
     /**
      * @param Request $request
      * @return Webhook
@@ -162,7 +178,8 @@ abstract class AbstractProvider implements ProviderContract, Responsable
      */
     protected function handle(): static
     {
-        $class = $this->getClass($event = $this->webhook->getEvent());
+        $event = $this->webhook->getEvent();
+        $class = Arr::get($this->handlers, $this->webhook->getEvent()) ?: $this->getClass($event);
 
         if (class_exists($class)) {
             $class::dispatch($event, $this->webhook->getData());
